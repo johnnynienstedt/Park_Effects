@@ -8,6 +8,7 @@ Created on Wed Aug 21 13:19:26 2024
 
 import numpy as np
 import pandas as pd
+import pybaseball as pb
 import scipy.stats as stats
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -29,18 +30,51 @@ from sklearn.model_selection import train_test_split
 
 
 
-# function to retrieve pitch-by-pitch data (2021-2024)
+# function to retrieve pitch-by-pitch data (2021-2024) - should take roughly 30 minutes
 def get_data():
-    # import pitch data from 2021-2024
-    all_pitch_data = pd.read_csv('/Users/johnnynienstedt/Library/Mobile Documents/com~apple~CloudDocs/Baseball Analysis/Pitching Analysis/Shape+/all_pitch_data.csv', index_col=False)
     
-    drop_cols = ['Unnamed: 0', 'level_0', 'index']
+    print('Gathering Pitch Data for 2021')
+    pitch_data_2021 = pb.statcast('2021-04-01', '2021-10-03')
+    print()
+    print('Gathering Pitch Data for 2022')
+    pitch_data_2022 = pb.statcast('2022-04-07', '2022-10-05')
+    print()
+    print('Gathering Pitch Data for 2023')
+    pitch_data_2023 = pb.statcast('2023-03-30', '2023-10-01')
+    print()
+    print('Gathering Pitch Data for 2024')
+    pitch_data_2024 = pb.statcast('2024-03-28', '2024-9-27')
+    
+    # remove deprecated/unnecessary columns
+    bad_cols = ['spin_rate_deprecated', 'break_angle_deprecated', 
+                'break_length_deprecated', 'tfs_deprecated', 
+                'tfs_zulu_deprecated', 'umpire', 'sv_id']
+    
+    pitch_data_2021 = pitch_data_2021.drop(columns=bad_cols)
+    pitch_data_2022 = pitch_data_2022.drop(columns=bad_cols)
+    pitch_data_2023 = pitch_data_2023.drop(columns=bad_cols)
+    pitch_data_2024 = pitch_data_2024.drop(columns=bad_cols)
+    
+    # ensure zone is present
+    pitch_data_2021 = pitch_data_2021.dropna(subset = ['zone'])
+    pitch_data_2022 = pitch_data_2022.dropna(subset = ['zone'])
+    pitch_data_2023 = pitch_data_2023.dropna(subset = ['zone'])
+    pitch_data_2024 = pitch_data_2024.dropna(subset = ['zone'])
+    
+    # ensure unique indices
+    pitch_data_2021 = pitch_data_2021.reset_index()
+    pitch_data_2022 = pitch_data_2022.reset_index()
+    pitch_data_2023 = pitch_data_2023.reset_index()
+    pitch_data_2024 = pitch_data_2024.reset_index()
+        
+    all_pitch_data = pd.concat([pitch_data_2021, pitch_data_2022, pitch_data_2023, pitch_data_2024])
+    all_pitch_data = all_pitch_data.reset_index()
+    
     necessary_cols = ['release_speed', 'pfx_x', 'pfx_z', 'vx0', 'vy0', 'vz0', 'ax',
                       'ay', 'az', 'release_pos_x', 'release_pos_y', 'release_pos_z', 
                       'release_extension']
     
-    clean_pitch_data = all_pitch_data.copy().drop(columns = drop_cols)
-    clean_pitch_data = clean_pitch_data.dropna(subset = necessary_cols)
+    clean_pitch_data = all_pitch_data.dropna(subset = necessary_cols)
     
     # select pitchers with at least 100 pitches thrown
     pitch_data = clean_pitch_data.groupby('pitcher').filter(lambda x: len(x) >= 100)
@@ -144,7 +178,7 @@ def get_data():
     return pitch_data
 pitch_data = get_data()
 
-# function for pitch level pairwise analysis
+# function for pitch level pairwise analysis – takes 3-7 minutes depending on statistic and parameters
 def pitch_level_analysis(data, master_df, who, statistic, colname=None, diff_type='raw', factor=None, pitch_types='all', conditions=None, min_events=10, variance_threshold=0.1):
         
     print()
@@ -454,7 +488,7 @@ def pitch_level_analysis(data, master_df, who, statistic, colname=None, diff_typ
     
     return park_grades
 
-# function for PA level pairwise analysis
+# function for PA level pairwise analysis - takes about 3 minutes
 def PA_level_analysis(data, master_df, statistic, colname=None, diff_type='raw', factor=None, pitch_types='all', conditions=None, min_events=None, variance_threshold=None):
         
     print()
